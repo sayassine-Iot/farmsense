@@ -113,6 +113,10 @@ export function createMockBackend(options: { now?: Date; role?: Role } = {}): Fa
     },
     livestock: {
       listAnimals: async (farmId) => farmData(farmId).animals,
+      getHerdActivity: async (farmId, from, to) => {
+        if (!(from < to)) throw new ApiError('invalid_request', '`from` must be before `to`');
+        return farmData(farmId).herdActivity.filter((h) => h.hourStart >= from && h.hourStart < to);
+      },
     },
     devices: {
       getRegistry: async (farmId) => {

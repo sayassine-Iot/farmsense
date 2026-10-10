@@ -6,7 +6,12 @@
  */
 import type { Crop, Farm, FarmSnapshot, Field, IrrigationZone, WaterTank } from '../../../types/domain';
 import { createRng, hashSeed, SnapshotBuilder } from './builder';
+import { herdActivityHistory } from './herd-activity';
 import { addFlock, addHerd, generateIrrigationEvents, type ZoneSpec } from './generators';
+
+type BaseSnapshot = Omit<FarmSnapshot, 'herdActivity'>;
+/** Herd activity history kept by the demo analytics store. */
+const HERD_ACTIVITY_HOURS = 48;
 
 export const CROPS: Crop[] = [
   { id: 'crop-olive', key: 'olive', category: 'tree' },
@@ -105,7 +110,7 @@ function addZoneDevices(
   }
 }
 
-function buildZitouna(now: Date): FarmSnapshot {
+function buildZitouna(now: Date): BaseSnapshot {
   const farm = FARMS[0];
   const b = new SnapshotBuilder(farm.id, now);
   const rng = createRng(hashSeed(farm.id));
@@ -181,20 +186,28 @@ function buildZitouna(now: Date): FarmSnapshot {
   // Livestock
   addHerd(b, rng, {
     species: 'cattle', prefix: 'c', count: 18, tagged: 18, group: 'Dairy herd',
-    metrics: { rumination: true, bodyTemperature: [38.3, 39.1] },
-    overrides: { 3: { activityRatio: 1.72 }, 7: { bodyTemperatureC: 40.1 }, 11: { lastSeenMinAgo: 145 }, 14: { batteryPct: 12 } },
+    metrics: { rumination: true, bodyTemperature: [38.3, 39.1], respiration: [24, 36], heartRate: { range: [54, 78], tags: 8 }, gps: true },
+    overrides: {
+      2: { ruminationMin: 255 },
+      3: { activityRatio: 1.72 },
+      5: { heartRateBpm: 96 },
+      7: { bodyTemperatureC: 40.1, respirationPerMin: 46 },
+      9: { respirationPerMin: 43 },
+      11: { lastSeenMinAgo: 145 },
+      14: { batteryPct: 12 },
+    },
   });
   addHerd(b, rng, {
     species: 'sheep', prefix: 's', count: 46, tagged: 16, group: 'Ewe flock',
-    metrics: {}, overrides: { 5: { activityRatio: 0.42 } },
+    metrics: { gps: true }, overrides: { 5: { activityRatio: 0.42 } },
   });
   addHerd(b, rng, {
     species: 'goat', prefix: 'g', count: 14, tagged: 6, group: 'Goat herd',
-    metrics: {}, overrides: { 2: { batteryPct: 16 } },
+    metrics: { gps: true }, overrides: { 2: { batteryPct: 16 } },
   });
   addHerd(b, rng, {
     species: 'horse', prefix: 'h', count: 2, tagged: 2, group: 'Stable', names: ['Barq', 'Nour'],
-    metrics: {},
+    metrics: { gps: true },
   });
   addFlock(b, { code: 'PL-A', group: 'Laying hens – house A', headcount: 140, sensor: { temperatureC: 26.8, humidityPct: 61, lastSeenMinAgo: 3 } });
 
@@ -205,7 +218,7 @@ function buildZitouna(now: Date): FarmSnapshot {
   };
 }
 
-function buildNefzaoua(now: Date): FarmSnapshot {
+function buildNefzaoua(now: Date): BaseSnapshot {
   const farm = FARMS[1];
   const b = new SnapshotBuilder(farm.id, now);
   const rng = createRng(hashSeed(farm.id));
@@ -260,12 +273,13 @@ function buildNefzaoua(now: Date): FarmSnapshot {
   addHerd(b, rng, {
     species: 'camel', prefix: 'k', count: 7, tagged: 7, group: 'Camel herd',
     names: ['Sahbi', 'Ghazala', 'Rim', 'Zayed', 'Najma', 'Baraka', 'Wafa'],
-    metrics: { bodyTemperature: [36.4, 37.6] }, overrides: { 4: { activityRatio: 0.48 } },
+    metrics: { bodyTemperature: [36.4, 37.6], respiration: [8, 16], gps: true },
+    overrides: { 2: { respirationPerMin: 24 }, 4: { activityRatio: 0.48 } },
   });
-  addHerd(b, rng, { species: 'goat', prefix: 'g', count: 22, tagged: 8, group: 'Goat herd', metrics: {} });
+  addHerd(b, rng, { species: 'goat', prefix: 'g', count: 22, tagged: 8, group: 'Goat herd', metrics: { gps: true } });
   addHerd(b, rng, {
     species: 'sheep', prefix: 's', count: 30, tagged: 10, group: 'Barbarine flock',
-    metrics: {}, overrides: { 9: { batteryPct: 8 } },
+    metrics: { gps: true }, overrides: { 9: { batteryPct: 8 } },
   });
   addFlock(b, { code: 'PL-1', group: 'Backyard layers', headcount: 60, sensor: null });
 
@@ -276,14 +290,16 @@ function buildNefzaoua(now: Date): FarmSnapshot {
   };
 }
 
-const BUILDERS: Record<string, (now: Date) => FarmSnapshot> = {
+const BUILDERS: Record<string, (now: Date) => BaseSnapshot> = {
   'farm-zitouna': buildZitouna,
   'farm-nefzaoua': buildNefzaoua,
 };
 
 export function buildDemoSnapshot(farmId: string, now: Date): FarmSnapshot | null {
   const build = BUILDERS[farmId];
-  return build ? build(now) : null;
+  if (!build) return null;
+  const base = build(now);
+  return { ...base, herdActivity: herdActivityHistory(base, HERD_ACTIVITY_HOURS) };
 }
 
 /** Statuses set before the demo starts, so every alert state is visible. */

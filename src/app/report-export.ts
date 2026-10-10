@@ -1,5 +1,7 @@
 import type { I18nValue } from '../i18n/context';
 import type { CsvCell } from '../utils/csv';
+import { HERD_STATUSES, type HerdHealth } from '../modules/livestock/herd-health';
+import type { Species } from '../types/domain';
 import type { OverviewModel } from './overview-model';
 
 const n = (v: number | null, digits = 2) => (v === null ? '' : v.toFixed(digits));
@@ -54,4 +56,35 @@ export function buildSummaryCsv(model: OverviewModel, { t }: Pick<I18nValue, 't'
     ...model.alerts.map((a) => [t(`alerts.severity.${a.severity}`), t(`alerts.status.${a.status}`), t(`alert.${a.type}.title` as Parameters<typeof t>[0]), String(a.params.zone ?? a.params.field ?? a.params.animal ?? a.params.device ?? a.params.tank ?? a.target.id), a.createdAt]),
   ];
   return rows;
+}
+
+/** Herd Health export: headline figures, then every animal to check with its vitals. */
+export function buildHerdCsv(model: OverviewModel, herd: HerdHealth, scope: Species | 'all', { t }: Pick<I18nValue, 't'>): CsvCell[][] {
+  const { farm } = model.idx.snapshot;
+  return [
+    ['FarmSense', farm.name, farm.region, farm.country],
+    [t('export.dataNote')],
+    [t('export.generated'), new Date(model.now).toISOString(), t('herd.scope'), scope === 'all' ? t('livestock.allSpecies') : t(`species.${scope}`)],
+    [],
+    [t('export.section.summary')],
+    [t('export.metric'), t('export.value'), t('export.unit')],
+    [t('herd.kpi.total'), herd.totalHead, 'head'],
+    ...HERD_STATUSES.map((s): CsvCell[] => [t(`herd.status.${s}`), herd.status[s], 'head']),
+    [t('herd.kpi.activeTags'), herd.tags.online, 'tags'],
+    [t('herd.kpi.offlineTags'), herd.tags.offline, 'tags'],
+    [t('herd.kpi.battery'), n(herd.tags.avgBatteryPct, 1), '%'],
+    ...herd.coverage.map((c): CsvCell[] => [`${t('herd.coverage.title')} – ${t(`herd.sensor.${c.sensor}`)}`, n(c.pct, 1), '%']),
+    [],
+    [t('livestock.checkTitle')],
+    [
+      t('livestock.col.animal'), t('livestock.col.species'), t('livestock.col.status'),
+      `${t('herd.col.respiration')} (/min)`, `${t('livestock.col.temp')} (C)`, `${t('herd.col.heartRate')} (bpm)`,
+      `${t('livestock.col.activity')} (%)`, `${t('herd.details.rumination')} (min/day)`, `${t('livestock.col.battery')} (%)`, t('livestock.col.updated'),
+    ],
+    ...herd.toCheck.map((r): CsvCell[] => [
+      r.state.animal.tagNumber, t(`species.${r.state.animal.species}`), t(`livestock.status.${r.status}`),
+      n(r.respirationPerMin, 0), n(r.bodyTemperatureC, 1), n(r.heartRateBpm, 0),
+      n(r.activityPct, 0), n(r.ruminationMinPerDay, 0), n(r.batteryPct, 0), r.lastUpdate ?? '',
+    ]),
+  ];
 }

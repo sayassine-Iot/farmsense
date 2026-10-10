@@ -4,7 +4,7 @@ import { buildDemoSnapshot, FARMS } from '../api/mock/seed/farms';
 import { countAlerts, filterAlerts, transitionAlert } from '../modules/alerts-analytics/alerts';
 import { evaluateAlertRules } from '../api/mock/alert-rules';
 import { classifyMoisture } from '../modules/water-crop/fields';
-import { indexSnapshot, resolveReading } from '../modules/devices/telemetry';
+import { indexSnapshot, resolveReading, usableValue } from '../modules/devices/telemetry';
 import { buildOverview } from '../app/overview-model';
 import { volumeIn } from '../modules/water-crop/water';
 import { createMockBackend } from '../api/mock/mock-backend';
@@ -12,6 +12,7 @@ import { loadFarmSnapshot } from '../api/load-snapshot';
 import { ApiError } from '../api/types';
 import { toCsv } from '../utils/csv';
 import { getPeriod } from '../utils/time';
+import { herdHealth, HERD_STATUSES } from '../modules/livestock/herd-health';
 
 const NOWS = ['2026-10-10T02:10:00', '2026-10-10T09:35:00', '2026-10-10T21:50:00'].map((s) => new Date(s));
 const RANGES: DateRangeKey[] = ['today', '7d', '30d'];
@@ -220,4 +221,51 @@ describe('layer 2 — API & access control (demo backend)', () => {
     await api.alerts.updateAlertStatus('farm-zitouna', target.id, 'resolved');
     await expect(api.alerts.updateAlertStatus('farm-zitouna', target.id, 'acknowledged')).rejects.toMatchObject({ code: 'invalid_request' });
   });
+});
+
+describe.each(FARMS.map((f) => f.id))('herd health for %s', (farmId) => {
+  const now = NOWS[1];
+  const snap = buildDemoSnapshot(farmId, now)!;
+  const idx = indexSnapshot(snap);
+  const alerts = evaluateAlertRules(idx);
+  const all = herdHealth(idx, alerts, 'all');
+
+  it.each(['all', ...all.speciesAvailable] as const)('status, attention list and tags reconcile (%s)', (species) => {
+    const h = herdHealth(idx, alerts, species);
+    const animals = snap.animals.filter((a) => a.species !== 'poultry' && (species === 'all' || a.species === species));
+    expect(HERD_STATUSES.reduce((s, k) => s + h.status[k], 0)).toBe(h.totalHead);
+    expect(h.totalHead).toBe(animals.length);
+    expect(h.toCheck.length).toBe(h.status.critical + h.status.warning + h.status.offline);
+    expect(h.tags.total).toBe(animals.filter((a) => a.monitoringDeviceId).length);
+    expect(h.tags.online + h.tags.offline).toBe(h.tags.total);
+    expect(h.tags.total - h.tags.offline + h.status.untagged).toBeLessThanOrEqual(h.totalHead);
+    for (const c of h.coverage) if (c.pct !== null) expect(c.reporting).toBeLessThanOrEqual(c.eligible);
+    expect(h.activity).toHaveLength(24);
+  });
+
+  it('species views add up to the whole herd', () => {
+    const parts = all.speciesAvailable.map((s) => herdHealth(idx, alerts, s));
+    expect(parts.reduce((n, p) => n + p.totalHead, 0)).toBe(all.totalHead);
+    expect(parts.reduce((n, p) => n + p.toCheck.length, 0)).toBe(all.toCheck.length);
+  });
+
+  it.each(all.speciesAvailable)('the current activity hour matches the latest %s tag readings', (species) => {
+    const pct = snap.animals
+      .filter((a) => a.species === species && a.monitoringDeviceId && a.activityBaseline)
+      .map((a) => {
+        const v = usableValue(resolveReading(idx, `${a.monitoringDeviceId}:activity`));
+        return v === null ? null : (v / (a.activityBaseline as number)) * 100;
+      })
+      .filter((v): v is number => v !== null);
+    expect(pct.length).toBeGreaterThan(0);
+    const mean = pct.reduce((x, y) => x + y, 0) / pct.length;
+    const last = herdHealth(idx, alerts, species).activity.at(-1)!.activityPctOfBaseline;
+    expect(last).toBeCloseTo(mean, 0);
+  });
+});
+
+it('raises vital-sign alerts from neck-tag readings', () => {
+  const idx = indexSnapshot(buildDemoSnapshot('farm-zitouna', NOWS[1])!);
+  const types = new Set(evaluateAlertRules(idx).map((a) => a.type));
+  for (const t of ['respiration_high', 'heart_rate_high', 'rumination_low', 'body_temperature_high'] as const) expect(types.has(t)).toBe(true);
 });

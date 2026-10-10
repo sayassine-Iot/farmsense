@@ -17,7 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'overview', labelKey: 'nav.overview', icon: LayoutDashboard, phase: 1 },
   { id: 'water', labelKey: 'nav.water', icon: Droplets, phase: 2, plannedKey: 'soon.water' },
   { id: 'crops', labelKey: 'nav.crops', icon: Sprout, phase: 2, plannedKey: 'soon.crops' },
-  { id: 'livestock', labelKey: 'nav.livestock', icon: PawPrint, phase: 2, plannedKey: 'soon.livestock' },
+  { id: 'livestock', labelKey: 'nav.livestock', icon: PawPrint, phase: 1 },
   { id: 'devices', labelKey: 'nav.devices', icon: Cpu, phase: 2, plannedKey: 'soon.devices' },
   { id: 'alerts', labelKey: 'nav.alerts', icon: Bell, phase: 2, plannedKey: 'soon.alerts' },
   { id: 'analytics', labelKey: 'nav.analytics', icon: BarChart3, phase: 2, plannedKey: 'soon.analytics' },

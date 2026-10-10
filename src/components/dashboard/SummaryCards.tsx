@@ -159,3 +159,28 @@ export function DeviceCoverage({ model }: { model: OverviewModel }) {
     </Card>
   );
 }
+
+/** Compact irrigation status above the water chart (pumps, zones, data gaps). */
+export function IrrigationStatusStrip({ model }: { model: OverviewModel }) {
+  const { t } = useI18n();
+  const { irrigation } = model;
+  const items: { icon: LucideIcon; label: string; value: string; flag: 'warn' | 'crit' | null }[] = [
+    { icon: Waves, label: t('kpi.water.zonesActive'), value: `${irrigation.activeZones}/${irrigation.totalZones}`, flag: null },
+    { icon: Zap, label: t('kpi.irrigation.pumps'), value: `${irrigation.pumps.running}/${irrigation.pumps.total}`, flag: null },
+    { icon: AlertTriangle, label: t('kpi.irrigation.warnings'), value: String(irrigation.zonesWithWarnings), flag: irrigation.zonesWithWarnings ? 'warn' : null },
+    { icon: Gauge, label: t('kpi.irrigation.noData'), value: String(irrigation.zonesWithoutData), flag: irrigation.zonesWithoutData ? 'crit' : null },
+  ];
+  return (
+    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-line/70 shadow-card ring-1 ring-line/60 md:grid-cols-4">
+      {items.map(({ icon: Icon, label, value, flag }) => (
+        <div key={label} className="flex min-w-0 items-center gap-3 bg-surface px-4 py-3.5">
+          <Icon aria-hidden className={`size-[18px] shrink-0 ${flag === 'crit' ? 'text-crit' : flag === 'warn' ? 'text-warn' : 'text-ink-3'}`} />
+          <div className="min-w-0">
+            <dt className="truncate text-xs text-ink-3">{label}</dt>
+            <dd className={`tabular truncate text-[15px] font-bold ${flag === 'crit' ? 'text-crit' : flag === 'warn' ? 'text-warn' : 'text-ink'}`}>{value}</dd>
+          </div>
+        </div>
+      ))}
+    </dl>
+  );
+}

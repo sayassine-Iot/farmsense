@@ -146,6 +146,9 @@ export type SensorKind =
   | 'activity'
   | 'rumination'
   | 'body_temperature'
+  | 'respiration_rate'
+  | 'heart_rate'
+  /** GNSS fix; the reading value is the horizontal accuracy in metres (`null` = no fix). */
   | 'position';
 
 export interface Sensor {

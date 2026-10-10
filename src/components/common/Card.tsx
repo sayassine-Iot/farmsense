@@ -27,7 +27,7 @@ export function IconChip({ children, tone = 'neutral', size = 'md' }: { children
 
 export function Card({ id, title, subtitle, icon, actions, footer, className = '', bodyClassName = '', children }: CardProps) {
   return (
-    <section id={id} className={`flex min-w-0 flex-col rounded-2xl bg-surface shadow-card ring-1 ring-line/60 ${className}`}>
+    <section id={id} className={`flex min-w-0 flex-col rounded-2xl bg-surface shadow-card ring-1 ring-line/60 transition-shadow duration-200 hover:shadow-pop ${className}`}>
       {(title || actions) && (
         <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-5 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">

@@ -13,7 +13,7 @@ export type * from './operational';
 export type * from './telemetry';
 
 import type { Animal, Crop, Device, Farm, Field, IrrigationZone, ISODateString, Sensor, WaterTank } from './operational';
-import type { IrrigationEvent, TelemetryReading } from './telemetry';
+import type { HerdActivityBucket, IrrigationEvent, TelemetryReading } from './telemetry';
 
 /**
  * Everything the Farm Overview needs for one farm. Assembled by the user
@@ -31,6 +31,8 @@ export interface FarmSnapshot {
   irrigationCoveredFrom: ISODateString;
   // 3B Livestock
   animals: Animal[];
+  /** Hourly herd activity for the 24 h before `asOf`. */
+  herdActivity: HerdActivityBucket[];
   // 3C Devices
   devices: Device[];
   sensors: Sensor[];

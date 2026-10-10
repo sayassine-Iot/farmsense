@@ -124,6 +124,9 @@ export interface AnimalCheckRow {
   activityPct: number | null;
   activityLevel: ActivityLevel | null;
   bodyTemperatureC: number | null;
+  respirationPerMin: number | null;
+  heartRateBpm: number | null;
+  ruminationMinPerDay: number | null;
   batteryPct: number | null;
   lastUpdate: string | null;
 }
@@ -150,6 +153,9 @@ export function animalsToCheck(idx: SnapshotIndex, states: AnimalState[]): Anima
       activityPct,
       activityLevel,
       bodyTemperatureC: usableValue(resolveReading(idx, sensorOf(idx, animal.monitoringDeviceId, 'body_temperature'))),
+      respirationPerMin: usableValue(resolveReading(idx, sensorOf(idx, animal.monitoringDeviceId, 'respiration_rate'))),
+      heartRateBpm: usableValue(resolveReading(idx, sensorOf(idx, animal.monitoringDeviceId, 'heart_rate'))),
+      ruminationMinPerDay: usableValue(resolveReading(idx, sensorOf(idx, animal.monitoringDeviceId, 'rumination'))),
       batteryPct: device?.batteryPct ?? null,
       lastUpdate: device?.lastSeenAt ?? null,
     });

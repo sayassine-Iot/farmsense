@@ -56,7 +56,9 @@ export const SENSOR_UNITS: Record<SensorKind, string> = {
   activity: 'index',
   rumination: 'min/day',
   body_temperature: 'C',
-  position: 'geo',
+  respiration_rate: 'breaths/min',
+  heart_rate: 'bpm',
+  position: 'm',
 };
 
 /** Accumulates devices, sensors and readings for one farm. */

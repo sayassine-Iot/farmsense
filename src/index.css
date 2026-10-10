@@ -75,6 +75,18 @@
   }
 }
 
+/* Tab panel entrance (disabled under prefers-reduced-motion in Tabs). */
+@keyframes fs-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Recharts: keep focus ring off the SVG wrapper on click. */
 .recharts-wrapper:focus,
 .recharts-surface:focus {

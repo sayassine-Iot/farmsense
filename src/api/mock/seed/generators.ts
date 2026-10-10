@@ -1,5 +1,5 @@
 import type { Animal, IrrigationZone, Species } from '../../../types/domain';
-import { round, type Rng, type SnapshotBuilder } from './builder';
+import { createRng, hashSeed, round, type Rng, type SnapshotBuilder } from './builder';
 
 const MINUTE = 60_000;
 
@@ -100,6 +100,11 @@ export interface AnimalOverride {
   bodyTemperatureC?: number;
   lastSeenMinAgo?: number;
   batteryPct?: number;
+  ruminationMin?: number;
+  respirationPerMin?: number;
+  heartRateBpm?: number;
+  /** `false` = GNSS reports no fix. */
+  gpsFix?: boolean;
 }
 
 /** Adds a herd of individually tagged animals; the first `tagged` animals carry a tag. */
@@ -113,7 +118,14 @@ export function addHerd(
     tagged: number;
     group: string;
     names?: string[];
-    metrics: { rumination?: boolean; bodyTemperature?: [number, number] };
+    metrics: {
+      rumination?: boolean;
+      bodyTemperature?: [number, number];
+      respiration?: [number, number];
+      /** Heart-rate sensing is only on the first `tags` (premium) tags. */
+      heartRate?: { range: [number, number]; tags: number };
+      gps?: boolean;
+    };
     overrides?: Record<number, AnimalOverride>;
   },
 ): void {
@@ -143,9 +155,18 @@ export function addHerd(
       });
       deviceId = dev.id;
       b.sensor(dev, 'activity', 15, { value: round(baseline * ratio, 0) });
-      if (opts.metrics.rumination) b.sensor(dev, 'rumination', 60, { value: rumination });
+      if (opts.metrics.rumination) b.sensor(dev, 'rumination', 60, { value: o.ruminationMin ?? rumination });
       if (opts.metrics.bodyTemperature) {
         b.sensor(dev, 'body_temperature', 30, { value: round(o.bodyTemperatureC ?? temp, 1) });
+      }
+      // Vitals draw from their own stream so adding them leaves the other seeded values unchanged.
+      const vrng = createRng(hashSeed(`${id}:vitals`));
+      const { respiration, heartRate, gps } = opts.metrics;
+      if (respiration) b.sensor(dev, 'respiration_rate', 30, { value: o.respirationPerMin ?? round(vrng.between(...respiration), 0) });
+      if (heartRate && i < heartRate.tags) b.sensor(dev, 'heart_rate', 30, { value: o.heartRateBpm ?? round(vrng.between(...heartRate.range), 0) });
+      if (gps) {
+        const fix = o.gpsFix ?? vrng.next() > 0.12;
+        b.sensor(dev, 'position', 15, { value: fix ? round(vrng.between(2.5, 9), 1) : null });
       }
     }
 

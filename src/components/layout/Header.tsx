@@ -1,6 +1,6 @@
 import { Bell, CalendarDays, Check, ChevronDown, Download, Globe, LogOut, MapPin, Menu, RotateCcw, UserRound, Wifi, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { DATE_RANGES, type DateRangeKey } from '../../config/app';
+import { DATA_QUALITY, DATE_RANGES, type DateRangeKey } from '../../config/app';
 import { LOCALES, useI18n } from '../../i18n/context';
 import type { Alert, Farm, Session } from '../../types/domain';
 import { Popover } from '../common/Popover';
@@ -8,6 +8,7 @@ import { StatusBadge } from '../common/StatusBadge';
 import { SEVERITY_TONE } from '../common/tone';
 import { useToast } from '../common/toast-context';
 import { alertText } from '../dashboard/alert-text';
+import { LogoGlyph } from './BrandMark';
 
 const COUNTRY_NAMES: Record<string, Record<string, string>> = {
   MA: { en: 'Morocco', fr: 'Maroc', ar: 'المغرب' },
@@ -18,7 +19,8 @@ const COUNTRY_NAMES: Record<string, Record<string, string>> = {
 
 interface HeaderProps {
   title: string;
-  icon: LucideIcon;
+  /** Defaults to the farm-monitoring subtitle. */
+  subtitle?: string;
   farms: Farm[];
   farm: Farm | null;
   onFarmChange: (id: string) => void;
@@ -26,14 +28,18 @@ interface HeaderProps {
   onRangeChange: (r: DateRangeKey) => void;
   lastUpdate: string | null;
   now: number;
-  devicesOnline: { online: number; total: number } | null;
+  /** Connectivity chip: all devices, or neck tags on the herd page. */
+  connectivity: { kind: 'devices' | 'tags'; online: number; total: number } | null;
   /** Unacknowledged warning/critical alerts. */
   notifications: Alert[];
   onExport: (() => void) | null;
   onGoToAlerts: () => void;
   onOpenMenu: () => void;
   onResetDemo: () => void;
-  showDashboardControls: boolean;
+  /** Period picker (pages whose figures depend on it). */
+  showRange: boolean;
+  /** Live-data badge next to the title. */
+  showLive: boolean;
   session: Session | null;
 }
 
@@ -46,6 +52,27 @@ function Chip({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode 
   );
 }
 
+/** Feed status from the age of the newest reading: Live, Delayed or No data. */
+function LiveBadge({ lastUpdate, now }: { lastUpdate: string | null; now: number }) {
+  const { t, fmt } = useI18n();
+  const ageMin = lastUpdate ? (now - new Date(lastUpdate).getTime()) / 60_000 : null;
+  const state = ageMin === null ? 'none' : ageMin <= DATA_QUALITY.liveWithinMinutes ? 'live' : 'delayed';
+  const style = { live: 'bg-ok-bg text-ok ring-ok-mark/30', delayed: 'bg-warn-bg text-warn ring-warn-mark/30', none: 'bg-chip text-ink-2 ring-line' }[state];
+  const dot = { live: 'bg-ok-mark', delayed: 'bg-warn-mark', none: 'bg-ink-3' }[state];
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${style}`}
+      title={lastUpdate ? t('header.updated', { time: fmt.relative(lastUpdate, now) }) : undefined}
+    >
+      <span aria-hidden className="relative flex size-2">
+        {state === 'live' && <span className={`absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:hidden ${dot}`} />}
+        <span className={`relative inline-flex size-2 rounded-full ${dot}`} />
+      </span>
+      {t(`header.status.${state}`)}
+    </span>
+  );
+}
+
 const whiteButton = 'inline-flex h-10 items-center gap-2 rounded-xl bg-surface px-3.5 text-sm font-semibold text-ink shadow-card ring-1 ring-line hover:bg-subtle';
 
 export function Header(props: HeaderProps) {
@@ -53,7 +80,6 @@ export function Header(props: HeaderProps) {
   const notify = useToast();
   const { farm, notifications } = props;
   const roleLabel = props.session ? t(`role.${props.session.user.role}`) : '';
-  const TitleIcon = props.icon;
 
   return (
     <header className="px-4 pt-5 sm:px-6 lg:px-8 lg:pt-7">
@@ -64,17 +90,20 @@ export function Header(props: HeaderProps) {
             <Menu className="size-5" />
           </button>
           <span className="hidden size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-navy-700 to-navy-900 text-white shadow-[0_8px_20px_-6px_rgb(29_52_135/0.55)] sm:grid">
-            <TitleIcon aria-hidden className="size-7" strokeWidth={2} />
+            <LogoGlyph className="size-9" />
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-2xl font-extrabold tracking-tight text-ink sm:text-[30px] sm:leading-9">{props.title}</h1>
-            {farm && <p className="truncate text-sm text-ink-3 sm:text-[15px]">{t('header.subtitle', { farm: farm.name })}</p>}
+            <div className="flex min-w-0 items-center gap-2.5">
+              <h1 className="truncate text-2xl font-extrabold tracking-tight text-ink sm:text-[30px] sm:leading-9">{props.title}</h1>
+              {props.showLive && <LiveBadge lastUpdate={props.lastUpdate} now={props.now} />}
+            </div>
+            {farm && <p className="truncate text-sm text-ink-3 sm:text-[15px]">{props.subtitle ?? t('header.subtitle', { farm: farm.name })}</p>}
           </div>
         </div>
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-          {props.showDashboardControls && (
+          {props.showRange && (
             <Popover
               label={t('header.range')}
               panelClassName="w-56"
@@ -110,7 +139,7 @@ export function Header(props: HeaderProps) {
             </Popover>
           )}
 
-          {props.showDashboardControls && props.onExport && (
+          {props.onExport && (
             <button type="button" onClick={props.onExport} title={t('header.exportHint')} className={whiteButton}>
               <Download aria-hidden className="size-4" />
               <span className="hidden sm:inline">{t('header.export')}</span>
@@ -266,10 +295,12 @@ export function Header(props: HeaderProps) {
             </Chip>
           </span>
         )}
-        {props.devicesOnline && (
+        {props.connectivity && (
           <Chip icon={Wifi}>
-            <span className="whitespace-nowrap">{t('header.chipDevices', props.devicesOnline)}</span>
-            <span aria-hidden className={`size-2 rounded-full ${props.devicesOnline.online === props.devicesOnline.total ? 'bg-ok-mark' : 'bg-warn-mark'}`} />
+            <span className="whitespace-nowrap">
+              {t(props.connectivity.kind === 'tags' ? 'header.chipTags' : 'header.chipDevices', { online: props.connectivity.online, total: props.connectivity.total })}
+            </span>
+            <span aria-hidden className={`size-2 rounded-full ${props.connectivity.online === props.connectivity.total ? 'bg-ok-mark' : 'bg-warn-mark'}`} />
           </Chip>
         )}
       </div>

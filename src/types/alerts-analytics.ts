@@ -20,6 +20,9 @@ export type AlertType =
   | 'low_battery'
   | 'activity_deviation'
   | 'body_temperature_high'
+  | 'respiration_high'
+  | 'heart_rate_high'
+  | 'rumination_low'
   | 'irrigation_completed';
 
 export type AlertTarget =

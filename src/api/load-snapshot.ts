@@ -1,5 +1,5 @@
 import type { Farm, FarmSnapshot } from '../types/domain';
-import { DAY_MS } from '../utils/time';
+import { DAY_MS, HOUR_MS } from '../utils/time';
 import type { FarmSenseApi } from './types';
 
 /** Longest period shown (30 days) plus its comparison period, with a day of margin. */
@@ -18,7 +18,11 @@ export async function loadFarmSnapshot(api: FarmSenseApi, farm: Farm): Promise<F
     api.devices.getLatestReadings(farm.id),
   ]);
   const asOfMs = new Date(latest.asOf).getTime();
-  const irrigation = await api.waterCrop.listIrrigationEvents(farm.id, new Date(asOfMs - HISTORY_DAYS * DAY_MS).toISOString(), latest.asOf);
+  // Hour buckets are keyed by their start, so the current (partial) hour needs an exclusive end after `asOf`.
+  const [irrigation, herdActivity] = await Promise.all([
+    api.waterCrop.listIrrigationEvents(farm.id, new Date(asOfMs - HISTORY_DAYS * DAY_MS).toISOString(), latest.asOf),
+    api.livestock.getHerdActivity(farm.id, new Date(Math.floor(asOfMs / HOUR_MS) * HOUR_MS - 23 * HOUR_MS).toISOString(), new Date(asOfMs + 1).toISOString()),
+  ]);
 
   return {
     farm,
@@ -26,6 +30,7 @@ export async function loadFarmSnapshot(api: FarmSenseApi, farm: Farm): Promise<F
     irrigationEvents: irrigation.events,
     irrigationCoveredFrom: irrigation.coveredFrom,
     animals,
+    herdActivity,
     ...registry,
     latestReadings: latest.readings,
     asOf: latest.asOf,

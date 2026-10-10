@@ -3,10 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DATE_RANGES, DEFAULT_TARIFF, type DateRangeKey } from '../config/app';
 import { NAV_ITEMS, isNavId, type NavId } from '../config/navigation';
 import { useI18n } from '../i18n/context';
-import { buildSummaryCsv } from './report-export';
+import { buildHerdCsv, buildSummaryCsv } from './report-export';
 import { buildOverview } from './overview-model';
 import { api, can } from '../api';
-import type { ResourceTariff } from '../types/domain';
+import { herdHealth } from '../modules/livestock/herd-health';
+import type { ResourceTariff, Species } from '../types/domain';
 import { downloadCsv, fileStamp, toCsv } from '../utils/csv';
 import { readStored, writeStored } from '../utils/storage';
 import { useToast } from '../components/common/toast-context';
@@ -14,6 +15,7 @@ import { DemoBanner } from '../components/layout/DemoBanner';
 import { Header } from '../components/layout/Header';
 import { Sidebar } from '../components/layout/Sidebar';
 import { ComingSoonPage } from './pages/ComingSoonPage';
+import { HerdHealthPage } from './pages/HerdHealthPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { useFarmData, useSession } from './useFarmData';
 
@@ -53,6 +55,7 @@ export function App() {
   const [range, setRange] = usePreference<DateRangeKey>('range', 'today', (v) => DATE_RANGES.includes(v as DateRangeKey));
   const [tariff, setTariff] = usePreference<ResourceTariff>('tariff', DEFAULT_TARIFF, isTariff);
   const [storedFarmId, setFarmId] = usePreference<string | null>('farmId', null);
+  const [herdSpecies, setHerdSpecies] = usePreference<Species | 'all'>('herdSpecies', 'all', (v) => typeof v === 'string');
 
   const { session, farms } = useSession(api);
   const farm = farms.find((f) => f.id === storedFarmId) ?? farms[0] ?? null;
@@ -75,6 +78,14 @@ export function App() {
     [state, range, tariff],
   );
 
+  const herd = useMemo(() => {
+    if (!model || state.status !== 'ready') return null;
+    const h = herdHealth(model.idx, state.alerts, herdSpecies);
+    // A species missing on the selected farm falls back to the whole herd.
+    return herdSpecies === 'all' || h.speciesAvailable.includes(herdSpecies) ? h : herdHealth(model.idx, state.alerts, 'all');
+  }, [model, state, herdSpecies]);
+  const herdScope = herd && herdSpecies !== 'all' && herd.speciesAvailable.includes(herdSpecies) ? herdSpecies : 'all';
+
   const notifications = useMemo(() => model?.alerts.filter((a) => a.status === 'active' && a.severity !== 'info') ?? [], [model]);
 
   const exportSummary = useCallback(() => {
@@ -82,6 +93,12 @@ export function App() {
     downloadCsv(`farmsense-summary-${model.idx.snapshot.farm.id}-${model.period.range}-${fileStamp(model.now)}.csv`, toCsv(buildSummaryCsv(model, { t })));
     notify(t('export.done'), 'success');
   }, [model, notify, t]);
+
+  const exportHerd = useCallback(() => {
+    if (!model || !herd) return;
+    downloadCsv(`farmsense-herd-${model.idx.snapshot.farm.id}-${herdScope}-${fileStamp(model.now)}.csv`, toCsv(buildHerdCsv(model, herd, herdScope, { t })));
+    notify(t('export.done'), 'success');
+  }, [model, herd, herdScope, notify, t]);
 
   const goToAlerts = useCallback(() => {
     if (route !== 'overview') navigate('overview');
@@ -112,9 +129,13 @@ export function App() {
         <DemoBanner />
         <div className="mx-auto flex w-full max-w-[1680px] flex-1 flex-col">
         <Header
-          title={t(navItem.labelKey)}
-          icon={navItem.icon}
-          devicesOnline={model ? { online: model.devices.online, total: model.devices.total } : null}
+          title={route === 'livestock' ? t('herd.title') : t(navItem.labelKey)}
+          subtitle={route === 'livestock' && farm ? t('herd.subtitle', { farm: farm.name }) : undefined}
+          connectivity={
+            route === 'livestock'
+              ? herd && { kind: 'tags', online: herd.tags.online, total: herd.tags.total }
+              : model && { kind: 'devices', online: model.devices.online, total: model.devices.total }
+          }
           farms={farms}
           farm={farm}
           onFarmChange={setFarmId}
@@ -123,7 +144,7 @@ export function App() {
           lastUpdate={model?.lastUpdate ?? null}
           now={model?.now ?? 0}
           notifications={notifications}
-          onExport={model && can(session, 'reports:export') ? exportSummary : null}
+          onExport={!model || !can(session, 'reports:export') ? null : route === 'overview' ? exportSummary : route === 'livestock' ? exportHerd : null}
           session={session}
           onGoToAlerts={goToAlerts}
           onOpenMenu={() => setMobileNav(true)}
@@ -132,10 +153,11 @@ export function App() {
             reload();
             notify(t('user.resetDone'), 'success');
           }}
-          showDashboardControls={route === 'overview'}
+          showRange={route === 'overview'}
+          showLive={!!model && (route === 'overview' || route === 'livestock')}
         />
         <main className="w-full flex-1 px-4 pb-8 pt-5 sm:px-6 lg:px-8 lg:pt-6">
-          {route !== 'overview' ? (
+          {route !== 'overview' && route !== 'livestock' ? (
             <ComingSoonPage item={navItem} onBack={() => navigate('overview')} />
           ) : state.status === 'loading' || !model ? (
             state.status === 'error' ? (
@@ -151,6 +173,8 @@ export function App() {
                 <Loader2 className="size-4 animate-spin" /> {t('overview.loading')}
               </div>
             )
+          ) : route === 'livestock' ? (
+            herd && <HerdHealthPage herd={herd} now={model.now} species={herdScope} onSpeciesChange={setHerdSpecies} />
           ) : (
             <OverviewPage model={model} session={session} onRangeChange={setRange} onTariffChange={setTariff} onAlertUpdate={onAlertUpdate} pendingAlertIds={pending} />
           )}

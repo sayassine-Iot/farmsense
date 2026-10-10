@@ -14,7 +14,7 @@ import { alertText } from './alert-text';
 const STATUS_TONE: Record<AnimalCheckRow['status'], Tone> = { alert: 'crit', monitor: 'warn', offline: 'neutral' };
 const ACTIVITY_TONE = { low: 'warn', high: 'warn', normal: 'ok' } as const;
 
-function BatteryCell({ pct }: { pct: number | null }) {
+export function BatteryCell({ pct }: { pct: number | null }) {
   const { fmt, t } = useI18n();
   if (pct === null) return <span className="text-ink-3">{t('common.unavailable')}</span>;
   const Icon = pct <= 20 ? BatteryLow : pct <= 60 ? BatteryMedium : Battery;

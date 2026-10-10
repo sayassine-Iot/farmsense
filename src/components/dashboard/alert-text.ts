@@ -42,6 +42,13 @@ export function alertText(alert: Alert, { t, fmt }: Pick<I18nValue, 't' | 'fmt'>
       formatted.threshold = fmt.temperature(num('threshold'));
       formatted.species = t(`species.${p.species as Species}`);
       break;
+    case 'respiration_high':
+    case 'heart_rate_high':
+    case 'rumination_low':
+      formatted.value = fmt.number(num('value'));
+      formatted.threshold = fmt.number(num('threshold'));
+      formatted.species = t(`species.${p.species as Species}`);
+      break;
     case 'irrigation_completed':
       formatted.volume = fmt.volume(num('volume'), 1);
       formatted.minutes = fmt.duration(num('minutes'));

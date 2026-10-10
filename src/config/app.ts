@@ -4,6 +4,8 @@ import type { CurrencyCode, DeviceType, ResourceTariff, SensorKind, Species } fr
 export const DATA_QUALITY = {
   /** A device with no contact for longer than this is offline. */
   offlineAfterMinutes: 60,
+  /** The header shows "Live" while the newest reading is younger than this. */
+  liveWithinMinutes: 15,
   /** A reading older than `reportingInterval × staleAfterIntervals` is stale. */
   staleAfterIntervals: 3,
   /** Battery level (%) at or below which a device is reported as low battery. */
@@ -22,6 +24,12 @@ export const ALERT_RULES = {
   activityHighRatio: 1.5,
   /** Body temperature (°C) above which an alert is raised, per species. */
   bodyTemperatureHighC: { cattle: 39.8, buffalo: 39.8, camel: 39.5 } as Partial<Record<Species, number>>,
+  /** Resting respiration (breaths/min) above which heat stress or respiratory disease is suspected. */
+  respirationHighPerMin: { cattle: 40, buffalo: 40, camel: 20 } as Partial<Record<Species, number>>,
+  /** Heart rate (bpm) above which a check is advised. */
+  heartRateHighBpm: { cattle: 84, buffalo: 84 } as Partial<Record<Species, number>>,
+  /** Daily rumination (min) below which a ruminant is flagged (feed or digestive problem). */
+  ruminationLowMinPerDay: 300,
   /** Number of most recent completed irrigation runs listed as info events. */
   recentIrrigationEvents: 3,
 } as const;
@@ -51,12 +59,12 @@ export const SPECIES_CONFIG: Record<
   Species,
   { metrics: SensorKind[]; monitoring: 'individual' | 'flock' }
 > = {
-  cattle: { metrics: ['activity', 'rumination', 'body_temperature', 'position'], monitoring: 'individual' },
-  buffalo: { metrics: ['activity', 'rumination', 'body_temperature', 'position'], monitoring: 'individual' },
+  cattle: { metrics: ['activity', 'rumination', 'body_temperature', 'respiration_rate', 'heart_rate', 'position'], monitoring: 'individual' },
+  buffalo: { metrics: ['activity', 'rumination', 'body_temperature', 'respiration_rate', 'heart_rate', 'position'], monitoring: 'individual' },
   sheep: { metrics: ['activity', 'position'], monitoring: 'individual' },
   goat: { metrics: ['activity', 'position'], monitoring: 'individual' },
   horse: { metrics: ['activity', 'position'], monitoring: 'individual' },
-  camel: { metrics: ['activity', 'body_temperature', 'position'], monitoring: 'individual' },
+  camel: { metrics: ['activity', 'body_temperature', 'respiration_rate', 'position'], monitoring: 'individual' },
   poultry: { metrics: ['air_temperature', 'air_humidity'], monitoring: 'flock' },
 };
 

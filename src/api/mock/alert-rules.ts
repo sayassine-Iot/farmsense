@@ -120,6 +120,25 @@ export function evaluateAlertRules(idx: SnapshotIndex): Alert[] {
         animal: label, species: a.species, value: t, threshold: limit,
       });
     }
+    const vital = (kind: 'respiration_rate' | 'heart_rate' | 'rumination') => {
+      const r = resolveReading(idx, sensorOf(idx, a.monitoringDeviceId, kind));
+      const v = usableValue(r);
+      return v !== null && r.timestamp ? { value: v, at: toMs(r.timestamp) } : null;
+    };
+    const resp = vital('respiration_rate');
+    const respLimit = ALERT_RULES.respirationHighPerMin[a.species];
+    if (resp && respLimit !== undefined && resp.value > respLimit) {
+      add('respiration_high', 'warning', { kind: 'animal', id: a.id }, resp.at, { animal: label, species: a.species, value: resp.value, threshold: respLimit });
+    }
+    const hr = vital('heart_rate');
+    const hrLimit = ALERT_RULES.heartRateHighBpm[a.species];
+    if (hr && hrLimit !== undefined && hr.value > hrLimit) {
+      add('heart_rate_high', 'warning', { kind: 'animal', id: a.id }, hr.at, { animal: label, species: a.species, value: hr.value, threshold: hrLimit });
+    }
+    const rum = vital('rumination');
+    if (rum && rum.value < ALERT_RULES.ruminationLowMinPerDay) {
+      add('rumination_low', 'warning', { kind: 'animal', id: a.id }, rum.at, { animal: label, species: a.species, value: rum.value, threshold: ALERT_RULES.ruminationLowMinPerDay });
+    }
   }
 
   // Informational: most recent completed irrigation runs (last 24 h)

@@ -9,6 +9,7 @@
  *   GET  /farms/:id/water-crop                → waterCrop.getSetup
  *   GET  /farms/:id/irrigation-events?from&to → waterCrop.listIrrigationEvents
  *   GET  /farms/:id/animals                   → livestock.listAnimals
+ *   GET  /farms/:id/herd-activity?from&to     → livestock.getHerdActivity
  *   GET  /farms/:id/devices                   → devices.getRegistry
  *   GET  /farms/:id/telemetry/latest          → devices.getLatestReadings
  *   GET  /farms/:id/alerts                    → alerts.listAlerts
@@ -21,6 +22,7 @@ import type {
   Device,
   Farm,
   Field,
+  HerdActivityBucket,
   IrrigationEvent,
   IrrigationZone,
   ISODateString,
@@ -53,6 +55,8 @@ export interface WaterCropApi {
 /** Module 3B — Livestock. */
 export interface LivestockApi {
   listAnimals(farmId: string): Promise<Animal[]>;
+  /** Hourly per-species herd aggregates with `hourStart` in [from, to). */
+  getHerdActivity(farmId: string, from: ISODateString, to: ISODateString): Promise<HerdActivityBucket[]>;
 }
 
 /** Module 3C — Devices. */
